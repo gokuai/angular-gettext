@@ -1,88 +1,42 @@
-angular.module('gettext').factory('gettextCatalog', function (gettextPlurals, $http, $cacheFactory, $interpolate, $rootScope) {
+angular.module('gettext').factory('gettextCatalog', [
+  'gettextPlurals',
+  '$http',
+  '$cacheFactory',
+  function (gettextPlurals, $http, $cacheFactory) {
     var catalog;
-    var noContext = '$$noContext';
-
-    // IE8 returns UPPER CASE tags, even though the source is lower case.
-    // This can causes the (key) string in the DOM to have a different case to
-    // the string in the `po` files.
-    var test = '<span>test</span>';
-    var isUpperCaseTags = (angular.element('<span>' + test + '</span>').html() !== test);
-
     var prefixDebug = function (string) {
-        if (catalog.debug && catalog.currentLanguage !== catalog.baseLanguage) {
-            return catalog.debugPrefix + string;
-        } else {
-            return string;
-        }
+      if (catalog.debug && catalog.currentLanguage !== catalog.baseLanguage) {
+        return '[MISSING]: ' + string;
+      } else {
+        return string;
+      }
     };
-
-    var addTranslatedMarkers = function (string) {
-        if (catalog.showTranslatedMarkers) {
-            return catalog.translatedMarkerPrefix + string + catalog.translatedMarkerSuffix;
-        } else {
-            return string;
-        }
-    };
-
-    function broadcastUpdated() {
-        $rootScope.$broadcast('gettextLanguageChanged');
-    }
-
     catalog = {
-        debug: false,
-        debugPrefix: '[MISSING]: ',
-        showTranslatedMarkers: false,
-        translatedMarkerPrefix: '[',
-        translatedMarkerSuffix: ']',
-        strings: {},
-        baseLanguage: 'en',
-        currentLanguage: 'en',
-        cache: $cacheFactory('strings'),
-
-        setCurrentLanguage: function (lang) {
-            this.currentLanguage = lang;
-            broadcastUpdated();
-        },
-
-        setStrings: function (language, strings) {
-            if (!this.strings[language]) {
-                this.strings[language] = {};
-            }
-
-            for (var key in strings) {
-                var val = strings[key];
-
-                if (isUpperCaseTags) {
-                    // Use the DOM engine to uppercase any tags in the key (#131).
-                    key = angular.element('<span>' + key + '</span>').html();
-                }
-
-                if (angular.isString(val) || angular.isArray(val)) {
-                    // No context, wrap it in $$noContext.
-                    var obj = {};
-                    obj[noContext] = val;
-                    val = obj;
-                }
-
-                // Expand single strings for each context.
-                for (var context in val) {
-                    var str = val[context];
-                    val[context] = angular.isArray(str) ? str : [str];
-                }
-                this.strings[language][key] = val;
-            }
-
-            broadcastUpdated();
-        },
-
-        getStringForm: function (string, n, context) {
-            var stringTable = this.strings[this.currentLanguage] || {};
-            var contexts = stringTable[string] || {};
-            var plurals = contexts[context || noContext] || [];
-            return plurals[n];
-        },
-
-        getString: function (string,arr) {
+      debug: false,
+      strings: {},
+      baseLanguage: 'en',
+      currentLanguage: 'en',
+      cache: $cacheFactory('strings'),
+      setStrings: function (language, strings) {
+        var key, val, _results;
+        if (!this.strings[language]) {
+          this.strings[language] = {};
+        }
+        for (key in strings) {
+          val = strings[key];
+          if (typeof val === 'string') {
+            this.strings[language][key] = [val];
+          } else {
+            this.strings[language][key] = val;
+          }
+        }
+      },
+      getStringForm: function (string, n) {
+        var stringTable = this.strings[this.currentLanguage] || {};
+        var plurals = stringTable[string] || [];
+        return plurals[n];
+      },
+      getString: function (string,arr) {
            if(!arr || !(arr instanceof Array) || arr.length == 0) {
                return this.getStringForm(string, 0) || prefixDebug(string);
            }else{
@@ -99,29 +53,22 @@ angular.module('gettext').factory('gettextCatalog', function (gettextPlurals, $h
                return str;
            }
       },
-
-        getPlural: function (n, string, stringPlural, scope, context) {
-            var form = gettextPlurals(this.currentLanguage, n);
-            string = this.getStringForm(string, form, context) || prefixDebug(n === 1 ? string : stringPlural);
-            if (scope) {
-                scope.$count = n;
-                string = $interpolate(string)(scope);
-            }
-            return addTranslatedMarkers(string);
-        },
-
-        loadRemote: function (url) {
-            return $http({
-                method: 'GET',
-                url: url,
-                cache: catalog.cache
-            }).success(function (data) {
-                for (var lang in data) {
-                    catalog.setStrings(lang, data[lang]);
-                }
-            });
-        }
+      getPlural: function (n, string, stringPlural) {
+        var form = gettextPlurals(this.currentLanguage, n);
+        return this.getStringForm(string, form) || prefixDebug(n === 1 ? string : stringPlural);
+      },
+      loadRemote: function (url) {
+        return $http({
+          method: 'GET',
+          url: url,
+          cache: catalog.cache
+        }).success(function (data) {
+          for (var lang in data) {
+            catalog.setStrings(lang, data[lang]);
+          }
+        });
+      }
     };
-
     return catalog;
-});
+  }
+]);

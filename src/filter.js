@@ -1,7 +1,10 @@
-angular.module('gettext').filter('translate', function (gettextCatalog) {
-    function filter(input, context) {
-        return gettextCatalog.getString(input, null, context);
-    }
-    filter.$stateful = true;
-    return filter;
-});
+angular.module('gettext').filter('translate', [
+  'gettextCatalog',
+  '$interpolate',
+  '$parse',
+  function (gettextCatalog, $interpolate, $parse) {
+    return function (input) {
+       return gettextCatalog.getString(input);
+    };
+  }
+]);
